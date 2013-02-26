@@ -14,7 +14,7 @@ class CORS(object):
                 kw[k.split(prefix)[-1]] = v
 
 
-        self.pol_origin = kw.get("origin", "") # copy or *
+        self.pol_origin = kw.get("origin", "") # copy or * or a hostname
         self.pol_methods = kw.get("methods", "") # * or list of methods
         self.pol_headers = kw.get("headers", "") # * or list of headers
         self.pol_credentials = kw.get("credentials", "false") # true or false
@@ -58,7 +58,6 @@ class CORS(object):
                 if self.pol_maxage:
                     maxage = self.pol_maxage
                 
-                resp = []
                 if origin: resp.append(('Access-Control-Allow-Origin', origin))
                 if methods: resp.append(('Access-Control-Allow-Methods', methods))
                 if headers: resp.append(('Access-Control-Allow-Headers', headers))
@@ -80,6 +79,13 @@ class CORS(object):
                     origin = orig
                 elif self.pol_origin == "*":
                     origin = "*"
+                elif self.pol_origin == orig:
+                    origin = orig
+
+                if self.pol_credentials == 'true' and self.pol_origin == "*":
+                    # for credentialed access '*' are ignored in origin
+                    origin = orig
+                    
                 if origin:
                     headers.append(('Access-Control-Allow-Origin', origin))
 
