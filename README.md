@@ -30,7 +30,7 @@ def app(global_config, **settings):
     return CORS(config.make_wsgi_app(), headers="*", methods="*", maxage="180", origin="*")
 ```
 
-You can also plug it into your wsgi pipeline via paste ini to let it serve by waitress for instance:
+or plug it into your wsgi pipeline via paste ini to let it serve by waitress for instance:
 
 ```
 [app:myapp]
@@ -92,5 +92,5 @@ for `maxage`:
 * give the number of seconds the answer can be used by a client, anything nonempty will be copied verbatim
 
 
-As can bee seen in the example above, a policy needs to be created with the `policy` keyword.
+As can be seen in the example above, a policy needs to be created with the `policy` keyword.
 The options need then be prefixed with the policy name and a `_`.
