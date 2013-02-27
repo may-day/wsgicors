@@ -89,8 +89,8 @@ class CORS(object):
                 if origin:
                     headers.append(('Access-Control-Allow-Origin', origin))
 
-                if self.pol_credentials == 'true':
-                    headers.append(('Access-Control-Allow-Credentials', 'true'))
+                    if self.pol_credentials == 'true':
+                        headers.append(('Access-Control-Allow-Credentials', 'true'))
 
                 return start_response(status, headers, exc_info)
         else:

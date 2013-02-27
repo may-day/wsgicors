@@ -8,6 +8,13 @@ here = os.path.abspath(os.path.dirname(__file__))
 README = open(os.path.join(here, 'README.txt')).read()
 CHANGES = open(os.path.join(here, 'CHANGES.txt')).read()
 
+# hack, or test wont run on py2.7
+try:
+    import multiprocessing
+    import logging
+except:
+    pass
+
 setup(name='wsgicors',
       version=version,
       description="WSGI for Cross Origin Resource Sharing (CORS)",
@@ -27,6 +34,12 @@ setup(name='wsgicors',
       url="https://github.com/may-day/wsgicors",
       license='Apache Software License 2.0',
       py_modules=["wsgicors"],
+      tests_require = [
+        'nose',
+        'nose-testconfig',
+        'webob'
+        ],
+      test_suite = 'nose.collector',
       entry_points = """
       [paste.filter_app_factory]
       middleware = wsgicors:make_middleware
