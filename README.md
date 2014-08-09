@@ -59,8 +59,7 @@ free_methods=*
 free_maxage=180
 
 policy=subdom
-subdom_match=*.mycompany.com
-subdom_origin=copy
+subdom_origin=example.com example2.com *.example.com
 subdom_headers=*
 subdom_methods=*
 subdom_maxage=180
