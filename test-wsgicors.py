@@ -12,6 +12,14 @@ free = {"policy":"pol",
         "pol_maxage":"100"
         }
 
+wildcard = {"policy":"pol", 
+        "pol_origin":"example.com example?.com *.example.com", 
+        "pol_methods":"*", 
+        "pol_headers":"*",
+        "pol_credentials":"true",
+        "pol_maxage":"100"
+        }
+
 free_nocred = {"policy":"pol", 
         "pol_origin":"*", 
         "pol_methods":"*", 
@@ -31,12 +39,24 @@ verbatim = {"policy":"pol",
 post2 = post = preflight = None
 
 def setup():
-    global preflight, post, post2
+    global preflight, deniedpreflight, allowedpreflight, post, post2, post3
 
     preflight = Request.blank("/")
     preflight.method="OPTIONS"
     preflight.headers["Access-Control-Request-Method"] = "post"
     preflight.headers["Access-Control-Request-Headers"] = "*"
+
+    deniedpreflight = Request.blank("/")
+    deniedpreflight.method="OPTIONS"
+    deniedpreflight.headers["Access-Control-Request-Method"] = "post"
+    deniedpreflight.headers["Access-Control-Request-Headers"] = "*"
+    deniedpreflight.headers["Origin"] = "somedomain.com"
+
+    allowedpreflight = Request.blank("/")
+    allowedpreflight.method="OPTIONS"
+    allowedpreflight.headers["Access-Control-Request-Method"] = "post"
+    allowedpreflight.headers["Access-Control-Request-Headers"] = "*"
+    allowedpreflight.headers["Origin"] = "sub.example.com"
 
     post = Request.blank("/")
     post.method="POST"
@@ -45,6 +65,10 @@ def setup():
     post2 = Request.blank("/")
     post2.method="POST"
     post2.headers["Origin"] = "example2.com"
+
+    post3 = Request.blank("/")
+    post3.method="POST"
+    post3.headers["Origin"] = "sub.example.com"
 
 @with_setup(setup)
 def testdeny():
@@ -72,6 +96,31 @@ def testfree():
 
     res = post.get_response(corsed)
     assert res.headers.get("Access-Control-Allow-Origin", "") == "example.com"
+    assert res.headers.get("Access-Control-Allow-Credentials", "") == "true"
+
+@with_setup(setup)
+def testwildcard():
+    corsed = mw(Response(), wildcard)
+    res = deniedpreflight.get_response(corsed)
+    assert res.headers.get("Access-Control-Allow-Origin", "") == ""
+    assert res.headers.get("Access-Control-Allow-Credentials", "") == "true"
+    assert res.headers.get("Access-Control-Allow-Methods", "") == "post"
+    assert res.headers.get("Access-Control-Allow-Headers", "") == "*"
+    assert res.headers.get("Access-Control-Max-Age", "0") == "100"
+
+    res = allowedpreflight.get_response(corsed)
+    assert res.headers.get("Access-Control-Allow-Origin", "") == "sub.example.com"
+    assert res.headers.get("Access-Control-Allow-Credentials", "") == "true"
+    assert res.headers.get("Access-Control-Allow-Methods", "") == "post"
+    assert res.headers.get("Access-Control-Allow-Headers", "") == "*"
+    assert res.headers.get("Access-Control-Max-Age", "0") == "100"
+
+    res = post.get_response(corsed)
+    assert res.headers.get("Access-Control-Allow-Origin", "") == "example.com"
+    assert res.headers.get("Access-Control-Allow-Credentials", "") == "true"
+
+    res = post3.get_response(corsed)
+    assert res.headers.get("Access-Control-Allow-Origin", "") == "sub.example.com"
     assert res.headers.get("Access-Control-Allow-Credentials", "") == "true"
 
 

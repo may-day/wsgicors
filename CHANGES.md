@@ -1,6 +1,10 @@
 Changes
 =======
 
+Version 0.3
+------------
+- `origin` now takes space separated list of hostnames. They can be filename patterns like *.domain.tld
+
 Version 0.2
 ------------
 

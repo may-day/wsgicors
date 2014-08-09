@@ -1,3 +1,5 @@
+import fnmatch
+
 class CORS(object):
     "WSGI middleware allowing CORS requests to succeed"
 
@@ -14,7 +16,13 @@ class CORS(object):
                 kw[k.split(prefix)[-1]] = v
 
 
-        self.pol_origin = kw.get("origin", "") # copy or * or a hostname
+        self.pol_origin = kw.get("origin", "") # copy or * or a space separated list of hostnames, possibly with filename wildcards "*" and "?"
+        if self.pol_origin not in ("copy", "*"):
+            self.match=filter(lambda x: x != "*", map(lambda x: x.strip(), self.pol_origin.split(" ")))
+        else:
+            self.match = []
+        self.pol_origin = kw.get("origin", "") # copy or * or a space separated list of hostnames, possibly with filename wildcards "*" and "?"
+
         self.pol_methods = kw.get("methods", "") # * or list of methods
         self.pol_headers = kw.get("headers", "") # * or list of headers
         self.pol_credentials = kw.get("credentials", "false") # true or false
@@ -24,6 +32,9 @@ class CORS(object):
  
  
     def __call__(self, environ, start_response):
+
+        def matchpattern(accu, pattern, host):
+            return accu or fnmatch.fnmatch(host, pattern)
 
         if 'OPTIONS' == environ['REQUEST_METHOD']:
             resp = []
@@ -37,8 +48,12 @@ class CORS(object):
                 credentials = None
                 maxage = None
 
-                if self.pol_origin == "copy":
-                    origin = environ.get("HTTP_ORIGIN",None)
+                orig=environ.get("HTTP_ORIGIN",None)
+                if orig and self.match:
+                    if reduce(lambda accu, x: matchpattern(accu, x, orig.lower()), self.match, False):
+                        origin = orig
+                elif self.pol_origin == "copy":
+                    origin = orig
                 elif self.pol_origin:
                     origin = self.pol_origin
 
@@ -75,7 +90,9 @@ class CORS(object):
             def custom_start_response(status, headers, exc_info=None):
                 origin = None
 
-                if self.pol_origin == "copy":
+                if orig and self.match and reduce(lambda accu, x: matchpattern(accu, x, orig.lower()), self.match, False):
+                    origin = orig
+                elif self.pol_origin == "copy":
                     origin = orig
                 elif self.pol_origin == "*":
                     origin = "*"
