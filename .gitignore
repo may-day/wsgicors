@@ -1,6 +1,7 @@
 *~
 .*
 /.tox
+/temp
 /build
 /dist
 /parts

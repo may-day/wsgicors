@@ -57,6 +57,12 @@ free_origin=copy
 free_headers=*
 free_methods=*
 free_maxage=180
+
+policy=subdom
+subdom_origin=example.com example2.com *.example.com
+subdom_headers=*
+subdom_methods=*
+subdom_maxage=180
 ```
 
 Keywords are:
@@ -70,6 +76,7 @@ Keywords are:
 for `origin`:
 
 * use `copy` which will copy whatever origin the request comes from
+* a space separated list of hostnames - they can also contain wildcards like `*` or `?` (fnmatch lib is used for matching). If a match is found the original host is returned.
 * any other literal will be be copied verbatim (like `*` for instance to allow every source)
 
 for `headers`: 
@@ -90,7 +97,6 @@ for `credentials`:
 for `maxage`:
 
 * give the number of seconds the answer can be used by a client, anything nonempty will be copied verbatim
-
 
 As can be seen in the example above, a policy needs to be created with the `policy` keyword.
 The options need then be prefixed with the policy name and a `_`.
