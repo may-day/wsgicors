@@ -17,15 +17,15 @@ class CORS(object):
             for k, v in filter(lambda key_value: key_value[0].startswith(prefix), cfg.items()):
                 kw[k.split(prefix)[-1]] = v
 
-        self.pol_origin = kw.get("origin",
-                                 "")  # copy or * or a space separated list of hostnames, possibly with filename wildcards "*" and "?"
+        # copy or * or a space separated list of hostnames, possibly with filename wildcards "*" and "?"
+        self.pol_origin = kw.get("origin", "")  
         if self.pol_origin not in ("copy", "*"):
             self.match = list(filter(lambda x: x != "*", map(lambda x: x.strip(), self.pol_origin.split(" "))))
         else:
             self.match = []
-        self.pol_origin = kw.get("origin",
-                                 "")  # copy or * or a space separated list of hostnames, possibly with filename wildcards "*" and "?"
 
+        # copy or * or a space separated list of hostnames, possibly with filename wildcards "*" and "?"
+        self.pol_origin = kw.get("origin", "")  
         self.pol_methods = kw.get("methods", "")  # * or list of methods
         self.pol_headers = kw.get("headers", "")  # * or list of headers
         self.pol_credentials = kw.get("credentials", "false")  # true or false
@@ -38,6 +38,9 @@ class CORS(object):
 
         def matchpattern(accu, pattern, host):
             return accu or fnmatch.fnmatch(host, pattern)
+
+        def matchlist(origin, allowed_origins):
+            return reduce(lambda accu, x: matchpattern(accu, x, origin.lower()), allowed_origins, False)
 
         if 'OPTIONS' == environ['REQUEST_METHOD']:
             resp = []
@@ -53,7 +56,7 @@ class CORS(object):
 
                 orig = environ.get("HTTP_ORIGIN", None)
                 if orig and self.match:
-                    if reduce(lambda accu, x: matchpattern(accu, x, orig.lower()), self.match, False):
+                    if matchlist(orig, self.match):
                         origin = orig
                 elif self.pol_origin == "copy":
                     origin = orig
@@ -91,8 +94,7 @@ class CORS(object):
             def custom_start_response(status, headers, exc_info=None):
                 origin = None
 
-                if orig and self.match and reduce(lambda accu, x: matchpattern(accu, x, orig.lower()), self.match,
-                                                  False):
+                if orig and self.match and matchlist(orig, self.match):
                     origin = orig
                 elif self.pol_origin == "copy":
                     origin = orig

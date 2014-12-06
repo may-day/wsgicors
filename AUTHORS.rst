@@ -1,0 +1,15 @@
+Credits
+=======
+
+“wsgicors” is written and maintained by Norman Krämer.
+
+
+Contributors
+------------
+
+The following people contributed directly or indirectly to this project:
+
+- `Julien De Vos <https://github.com/JDeVos>`_
+- `Ryan Shaw <https://github.com/ryankshaw>`_
+
+Please add yourself here when you submit your first pull request.

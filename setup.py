@@ -5,8 +5,9 @@ import sys, os
 version = '0.3'
 
 here = os.path.abspath(os.path.dirname(__file__))
-README = open(os.path.join(here, 'README.md')).read()
-CHANGES = open(os.path.join(here, 'CHANGES.md')).read()
+README = open(os.path.join(here, 'README.rst')).read()
+CHANGES = open(os.path.join(here, 'CHANGES.rst')).read()
+AUTHORS = open(os.path.join(here, 'AUTHORS.rst')).read()
 
 # hack, or test wont run on py2.7
 try:
@@ -18,10 +19,11 @@ except:
 setup(name='wsgicors',
       version=version,
       description="WSGI for Cross Origin Resource Sharing (CORS)",
-      long_description=README + '\n\n' +  CHANGES,
+      long_description=README + '\n\n' +  CHANGES + '\n\n' +  AUTHORS,
       classifiers = [
         "License :: OSI Approved :: Apache Software License",
         "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
         "Development Status :: 3 - Alpha",
         "Environment :: Web Environment",
         "Intended Audience :: Developers",
