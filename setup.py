@@ -1,13 +1,18 @@
 #-*- coding:utf-8 -*-
 from setuptools import setup
 import sys, os
+import codecs
+
+here = os.path.abspath(os.path.dirname(__file__))
+
+def readfile(fname):
+    return codecs.open(os.path.join(here, fname), encoding='utf-8').read()
 
 version = '0.4'
 
-here = os.path.abspath(os.path.dirname(__file__))
-README = open(os.path.join(here, 'README.rst')).read()
-CHANGES = open(os.path.join(here, 'CHANGES.rst')).read()
-AUTHORS = open(os.path.join(here, 'AUTHORS.rst')).read()
+README = readfile('README.rst')
+CHANGES = readfile('CHANGES.rst')
+AUTHORS = readfile('AUTHORS.rst')
 
 # hack, or test wont run on py2.7
 try:
