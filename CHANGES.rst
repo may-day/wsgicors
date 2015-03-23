@@ -1,6 +1,11 @@
 Changes
 =======
 
+Version 0.4.1
+-------------
+
+-  py3 utf-8 related setup fixes
+
 Version 0.4
 -----------
 
