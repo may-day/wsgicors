@@ -1,6 +1,12 @@
 Changes
 =======
 
+Version 0.5.0
+-------------
+
+- support for Access-Control-Expose-Headers
+- Header ``Vary`` is set to ``Origin`` if origin policy differs from ``*``
+
 Version 0.4.1
 -------------
 

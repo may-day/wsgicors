@@ -60,6 +60,7 @@ waitress for instance:
     policy=free
     free_origin=copy
     free_headers=*
+    free_expose_headers=*
     free_methods=*
     free_maxage=180
 
@@ -67,6 +68,7 @@ waitress for instance:
     subdom_origin=example.com example2.com *.example.com
     subdom_headers=*
     subdom_methods=*
+    subdom_expose_headers=Foo, Doom
     subdom_maxage=180
 
 Keywords are:
@@ -89,8 +91,12 @@ for ``origin``:
 for ``headers``:
 
 -  use ``*`` which will allow whatever header is asked for
--  any other literal will be be copied verbatim (like ``*`` for instance
-   to allow every source)
+-  any other literal will be be copied verbatim
+
+for ``expose_headers``:
+
+-  use ``*`` to allow access to any header the client might wish to access
+-  any other literal will be be copied verbatim
 
 for ``methods``:
 

@@ -48,7 +48,7 @@ class CORS(object):
         self.pol_origin = kw.get("origin", "")  
         self.pol_methods = kw.get("methods", "")  # * or list of methods
         self.pol_headers = kw.get("headers", "")  # * or list of headers
-        self.pol_expose_headers = kw.get("expose_headers", "")  # * or list of headers
+        self.pol_expose_headers = kw.get("expose_headers", "")  # * or list of headers to expose to the client
         self.pol_credentials = kw.get("credentials", "false")  # true or false
         self.pol_maxage = kw.get("maxage", "")  # in seconds
 
@@ -136,6 +136,9 @@ class CORS(object):
 
                     if self.pol_expose_headers:
                         headers.append(('Access-Control-Expose-Headers', self.pol_expose_headers))
+
+                    if self.pol_origin != "*":
+                        headers.append(('Vary', 'Origin'))
 
                 return start_response(status, headers, exc_info)
         else:

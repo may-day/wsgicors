@@ -28,6 +28,7 @@ free = {"policy":"pol",
         "pol_origin":"*", 
         "pol_methods":"*", 
         "pol_headers":"*",
+        "pol_expose_headers":"*",
         "pol_credentials":"true",
         "pol_maxage":"100"
         }
@@ -52,9 +53,11 @@ verbatim = {"policy":"pol",
         "pol_origin":"example.com", 
         "pol_methods":"put,delete", 
         "pol_headers":"header1,header2",
+        "pol_expose_headers":"X-ONLYTHIS,X-ONLYTHAT",
         "pol_credentials":"true",
         "pol_maxage":"100"
         }
+
 
 post2 = post = preflight = None
 
@@ -99,10 +102,14 @@ def testdeny():
     assert "Access-Control-Allow-Methods" not in res.headers
     assert "Access-Control-Allow-Headers" not in res.headers
     assert "Access-Control-Max-Age" not in res.headers
+    assert "Access-Control-Expose-Headers" not in res.headers
+    assert "Vary" not in res.headers
 
     res = post.get_response(corsed)
     assert "Access-Control-Allow-Origin" not in res.headers
     assert "Access-Control-Allow-Credentials" not in res.headers
+    assert "Access-Control-Expose-Headers" not in res.headers
+    assert "Vary" not in res.headers
 
 @with_setup(setup)
 def testfree():
@@ -113,10 +120,14 @@ def testfree():
     assert res.headers.get("Access-Control-Allow-Methods", "") == "post"
     assert res.headers.get("Access-Control-Allow-Headers", "") == "*"
     assert res.headers.get("Access-Control-Max-Age", "0") == "100"
+    assert "Access-Control-Expose-Headers" not in res.headers
+    assert "Vary" not in res.headers
 
     res = post.get_response(corsed)
     assert res.headers.get("Access-Control-Allow-Origin", "") == "example.com"
     assert res.headers.get("Access-Control-Allow-Credentials", "") == "true"
+    assert res.headers.get("Access-Control-Expose-Headers", "") == "*"
+    assert "Vary" not in res.headers
 
 @with_setup(setup)
 def testwildcard():
@@ -127,6 +138,8 @@ def testwildcard():
     assert res.headers.get("Access-Control-Allow-Methods", "") == "post"
     assert res.headers.get("Access-Control-Allow-Headers", "") == "*"
     assert res.headers.get("Access-Control-Max-Age", "0") == "100"
+    assert "Access-Control-Expose-Headers" not in res.headers
+    assert "Vary" not in res.headers
 
     res = allowedpreflight.get_response(corsed)
     assert res.headers.get("Access-Control-Allow-Origin", "") == "sub.example.com"
@@ -134,14 +147,20 @@ def testwildcard():
     assert res.headers.get("Access-Control-Allow-Methods", "") == "post"
     assert res.headers.get("Access-Control-Allow-Headers", "") == "*"
     assert res.headers.get("Access-Control-Max-Age", "0") == "100"
+    assert "Access-Control-Expose-Headers" not in res.headers
+    assert "Vary" not in res.headers
 
     res = post.get_response(corsed)
     assert res.headers.get("Access-Control-Allow-Origin", "") == "example.com"
     assert res.headers.get("Access-Control-Allow-Credentials", "") == "true"
+    assert "Access-Control-Expose-Headers" not in res.headers
+    assert res.headers.get("Vary", "") == "Origin"
 
     res = post3.get_response(corsed)
     assert res.headers.get("Access-Control-Allow-Origin", "") == "sub.example.com"
     assert res.headers.get("Access-Control-Allow-Credentials", "") == "true"
+    assert "Access-Control-Expose-Headers" not in res.headers
+    assert res.headers.get("Vary", "") == "Origin"
 
 
 @with_setup(setup)
@@ -157,11 +176,15 @@ def testfree_nocred():
     assert res.headers.get("Access-Control-Allow-Credentials", None) == None
     assert res.headers.get("Access-Control-Allow-Methods", "") == "post"
     assert res.headers.get("Access-Control-Allow-Headers", "") == "*"
+    assert "Vary" not in res.headers
+    assert "Access-Control-Expose-Headers" not in res.headers
     assert res.headers.get("Access-Control-Max-Age", "0") == "100"
 
     res = post.get_response(corsed)
     assert res.headers.get("Access-Control-Allow-Origin", "") == "*"
     assert res.headers.get("Access-Control-Allow-Credentials", None) == None
+    assert "Access-Control-Expose-Headers" not in res.headers
+    assert "Vary" not in res.headers
 
 @with_setup(setup)
 def testverbatim():
@@ -173,10 +196,14 @@ def testverbatim():
     assert res.headers.get("Access-Control-Allow-Methods", "") == "put,delete"
     assert res.headers.get("Access-Control-Allow-Headers", "") == "header1,header2"
     assert res.headers.get("Access-Control-Max-Age", "0") == "100"
+    assert "Access-Control-Expose-Headers" not in res.headers
+    assert "Vary" not in res.headers
 
     res = post.get_response(corsed)
     assert res.headers.get("Access-Control-Allow-Origin", "") == "example.com"
     assert res.headers.get("Access-Control-Allow-Credentials", "") == "true"
+    assert res.headers.get("Access-Control-Expose-Headers", "") == "X-ONLYTHIS,X-ONLYTHAT"
+    assert res.headers.get("Vary", "") == "Origin"
 
 @with_setup(setup)
 def test_req_origin_no_match():
@@ -189,9 +216,13 @@ def test_req_origin_no_match():
     assert res.headers.get("Access-Control-Allow-Methods", "") == "put,delete"
     assert res.headers.get("Access-Control-Allow-Headers", "") == "header1,header2"
     assert res.headers.get("Access-Control-Max-Age", "0") == "100"
+    assert "Access-Control-Expose-Headers" not in res.headers
+    assert "Vary" not in res.headers
 
     res = post2.get_response(corsed)
     assert "Access-Control-Allow-Origin" not in res.headers
     assert "Access-Control-Allow-Credentials" not in res.headers
+    assert "Access-Control-Expose-Headers" not in res.headers
+    assert "Vary" not in res.headers
 
     
