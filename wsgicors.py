@@ -63,7 +63,7 @@ class CORS(object):
         def matchlist(origin, allowed_origins):
             return reduce(lambda accu, x: matchpattern(accu, x, origin.lower()), allowed_origins, False)
 
-        if 'OPTIONS' == environ['REQUEST_METHOD']:
+        if 'OPTIONS' == environ['REQUEST_METHOD'] and environ.get("HTTP_ACCESS_CONTROL_REQUEST_METHOD") is not None:
             resp = []
             if self.policy == "deny":
                 pass
