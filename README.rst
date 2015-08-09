@@ -65,7 +65,7 @@ waitress for instance:
     free_maxage=180
 
     policy=subdom
-    subdom_origin=example.com example2.com *.example.com
+    subdom_origin=http://example.com http://example2.com https://*.example.com
     subdom_headers=*
     subdom_methods=*
     subdom_expose_headers=Foo, Doom
