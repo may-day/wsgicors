@@ -33,196 +33,366 @@ free = {"policy":"pol",
         "pol_maxage":"100"
         }
 
-wildcard = {"policy":"pol", 
-        "pol_origin":"example.com example?.com *.example.com", 
-        "pol_methods":"*", 
-        "pol_headers":"*",
-        "pol_credentials":"true",
-        "pol_maxage":"100"
-        }
-
-free_nocred = {"policy":"pol", 
-        "pol_origin":"*", 
-        "pol_methods":"*", 
-        "pol_headers":"*",
-        "pol_credentials":"false",
-        "pol_maxage":"100"
-        }
-
-verbatim = {"policy":"pol", 
-        "pol_origin":"example.com", 
-        "pol_methods":"put,delete", 
-        "pol_headers":"header1,header2",
-        "pol_expose_headers":"X-ONLYTHIS,X-ONLYTHAT",
-        "pol_credentials":"true",
-        "pol_maxage":"100"
-        }
-
-
-post2 = post = preflight = None
+preflight_headers = {'REQUEST_METHOD':'OPTIONS', 'Access-Control-Request-Method':'*', 'Origin':'localhost'}
+request_headers = {'REQUEST_METHOD':'GET', 'Access-Control-Request-Method':'*', 'Origin':'localhost'}
 
 def setup():
-    global preflight, deniedpreflight, allowedpreflight, post, post2, post3
+    pass
 
-    preflight = Request.blank("/")
-    preflight.method="OPTIONS"
-    preflight.headers["Access-Control-Request-Method"] = "post"
-    preflight.headers["Access-Control-Request-Headers"] = "*"
+@with_setup(setup)
+def test_non_preflight_are_not_answered():
+    "requests that don't match preflight criteria are ignored"
+    corsed = mw(Response("this is not a preflight response"), free)
 
-    deniedpreflight = Request.blank("/")
-    deniedpreflight.method="OPTIONS"
-    deniedpreflight.headers["Access-Control-Request-Method"] = "post"
-    deniedpreflight.headers["Access-Control-Request-Headers"] = "*"
-    deniedpreflight.headers["Origin"] = "somedomain.com"
+    for drop_header in preflight_headers.keys():
+        hdr=preflight_headers.copy()
+        del hdr[drop_header]
+        yield non_preflight_are_not_answered, corsed, hdr
 
-    allowedpreflight = Request.blank("/")
-    allowedpreflight.method="OPTIONS"
-    allowedpreflight.headers["Access-Control-Request-Method"] = "post"
-    allowedpreflight.headers["Access-Control-Request-Headers"] = "*"
-    allowedpreflight.headers["Origin"] = "sub.example.com"
+def non_preflight_are_not_answered(corsed, hdr):
+    "requests that don't match preflight criteria are ignored"
 
-    post = Request.blank("/")
-    post.method="POST"
-    post.headers["Origin"] = "example.com"
+    req = prepRequest(hdr)
+    res = req.get_response(corsed)
+    assert res.body.decode("utf-8") == "this is not a preflight response", "No preflight should have been detected (body was: '%s')" % res.body
+        
+def prepRequest(hdr, **kw):
+    req = Request.blank("/")
+    req.method= "GET" if "REQUEST_METHOD" not in hdr else hdr["REQUEST_METHOD"]
+    
+    for k, v in hdr.items():
+        if k != "REQUEST_METHOD":
+            req.headers[k] = v
 
-    post2 = Request.blank("/")
-    post2.method="POST"
-    post2.headers["Origin"] = "example2.com"
-
-    post3 = Request.blank("/")
-    post3.method="POST"
-    post3.headers["Origin"] = "sub.example.com"
+    for k,v in kw.items():
+        k=getRequestHeaderName(k)
+        req.headers[k] = v
+        
+    return req 
 
 @with_setup(setup)
 def testdeny():
-    corsed = mw(Response(), deny)
+    "Denied policy"
+    corsed = mw(Response("non preflight"), deny)
+    preflight = prepRequest(preflight_headers)
     res = preflight.get_response(corsed)
-    assert "Access-Control-Allow-Origin" not in res.headers
-    assert "Access-Control-Allow-Credentials" not in res.headers
-    assert "Access-Control-Allow-Methods" not in res.headers
-    assert "Access-Control-Allow-Headers" not in res.headers
-    assert "Access-Control-Max-Age" not in res.headers
-    assert "Access-Control-Expose-Headers" not in res.headers
-    assert "Vary" not in res.headers
-
-    res = post.get_response(corsed)
-    assert "Access-Control-Allow-Origin" not in res.headers
-    assert "Access-Control-Allow-Credentials" not in res.headers
-    assert "Access-Control-Expose-Headers" not in res.headers
-    assert "Vary" not in res.headers
+    assert res.body.decode("utf-8") == "", "Body must be empty but was:%s" % res.body
+    assert "Access-Control-Allow-Origin" not in res.headers, "Header should not be in repsonse"
+    assert "Access-Control-Allow-Credentials" not in res.headers, "Header should not be in repsonse"
+    assert "Access-Control-Allow-Methods" not in res.headers, "Header should not be in repsonse"
+    assert "Access-Control-Allow-Headers" not in res.headers, "Header should not be in repsonse"
+    assert "Access-Control-Max-Age" not in res.headers, "Header should not be in repsonse"
+    assert "Access-Control-Expose-Headers" not in res.headers, "Header should not be in repsonse"
+    assert "Vary" not in res.headers, "Header should not be in repsonse"
 
 @with_setup(setup)
-def testfree():
-    corsed = mw(Response(), free)
-    res = preflight.get_response(corsed)
-    assert res.headers.get("Access-Control-Allow-Origin", "") == "*"
-    assert res.headers.get("Access-Control-Allow-Credentials", "") == "true"
-    assert res.headers.get("Access-Control-Allow-Methods", "") == "post"
-    assert res.headers.get("Access-Control-Allow-Headers", "") == "*"
-    assert res.headers.get("Access-Control-Max-Age", "0") == "100"
-    assert "Access-Control-Expose-Headers" not in res.headers
-    assert "Vary" not in res.headers
+def test_origin_policy_match():
+    policy = free.copy()
+    policy["pol_origin"] = "example.com example?.com *.example.com"
 
-    res = post.get_response(corsed)
-    assert res.headers.get("Access-Control-Allow-Origin", "") == "example.com"
-    assert res.headers.get("Access-Control-Allow-Credentials", "") == "true"
-    assert res.headers.get("Access-Control-Expose-Headers", "") == "*"
-    assert "Vary" not in res.headers
+    corsed = mw(Response("non preflight response"), policy)
 
-@with_setup(setup)
-def testwildcard():
-    corsed = mw(Response(), wildcard)
-    res = deniedpreflight.get_response(corsed)
-    assert res.headers.get("Access-Control-Allow-Origin", "") == ""
-    assert res.headers.get("Access-Control-Allow-Credentials", "") == "true"
-    assert res.headers.get("Access-Control-Allow-Methods", "") == "post"
-    assert res.headers.get("Access-Control-Allow-Headers", "") == "*"
-    assert res.headers.get("Access-Control-Max-Age", "0") == "100"
-    assert "Access-Control-Expose-Headers" not in res.headers
-    assert "Vary" not in res.headers
+    ### preflight request
 
-    res = allowedpreflight.get_response(corsed)
-    assert res.headers.get("Access-Control-Allow-Origin", "") == "sub.example.com"
-    assert res.headers.get("Access-Control-Allow-Credentials", "") == "true"
-    assert res.headers.get("Access-Control-Allow-Methods", "") == "post"
-    assert res.headers.get("Access-Control-Allow-Headers", "") == "*"
-    assert res.headers.get("Access-Control-Max-Age", "0") == "100"
-    assert "Access-Control-Expose-Headers" not in res.headers
-    assert "Vary" not in res.headers
+    for origin, expected in [("localhost", None), 
+                             ("example.com", "example.com"), 
+                             ("example2.com", "example2.com"), 
+                             ("www.example.com", "www.example.com")]:
+        yield preflight_check_result, corsed, "Origin", origin, expected
 
-    res = post.get_response(corsed)
-    assert res.headers.get("Access-Control-Allow-Origin", "") == "example.com"
-    assert res.headers.get("Access-Control-Allow-Credentials", "") == "true"
-    assert "Access-Control-Expose-Headers" not in res.headers
-    assert res.headers.get("Vary", "") == "Origin"
 
-    res = post3.get_response(corsed)
-    assert res.headers.get("Access-Control-Allow-Origin", "") == "sub.example.com"
-    assert res.headers.get("Access-Control-Allow-Credentials", "") == "true"
-    assert "Access-Control-Expose-Headers" not in res.headers
-    assert res.headers.get("Vary", "") == "Origin"
+    ### actual request
+
+    for origin, origin_expected, vary_expected in [("localhost", None, None), 
+                                                   ("example.com", "example.com", "Origin"), 
+                                                   ("example2.com", "example2.com", "Origin"), 
+                                                   ("www.example.com", "www.example.com", "Origin")]:
+        yield request_check_result, corsed, "Origin", origin, origin_expected, ("Vary", vary_expected)
 
 
 @with_setup(setup)
-def testfree_nocred():
-    """
-    similar to free, but the actual request will be answered 
-    with a '*' for allowed origin
-    """
+def test_origin_policy_copy():
+    policy = free.copy()
+    policy["pol_origin"] = "copy"
 
-    corsed = mw(Response(), free_nocred)
-    res = preflight.get_response(corsed)
-    assert res.headers.get("Access-Control-Allow-Origin", "") == "*"
-    assert res.headers.get("Access-Control-Allow-Credentials", None) == None
-    assert res.headers.get("Access-Control-Allow-Methods", "") == "post"
-    assert res.headers.get("Access-Control-Allow-Headers", "") == "*"
-    assert "Vary" not in res.headers
-    assert "Access-Control-Expose-Headers" not in res.headers
-    assert res.headers.get("Access-Control-Max-Age", "0") == "100"
+    corsed = mw(Response("non preflight response"), policy)
 
-    res = post.get_response(corsed)
-    assert res.headers.get("Access-Control-Allow-Origin", "") == "*"
-    assert res.headers.get("Access-Control-Allow-Credentials", None) == None
-    assert "Access-Control-Expose-Headers" not in res.headers
-    assert "Vary" not in res.headers
+    ### preflight request
+
+    for origin, expected in [("localhost", "localhost"), 
+                             ("example.com", "example.com")]:
+        yield preflight_check_result, corsed, "Origin", origin, expected
+
+
+    ### actual request
+
+    for origin, origin_expected, vary_expected in [("localhost", "localhost", "Origin"), 
+                                                   ("example.com", "example.com", "Origin")]:
+        yield request_check_result, corsed, "Origin", origin, origin_expected, ("Vary", vary_expected)
 
 @with_setup(setup)
-def testverbatim():
+def test_origin_policy_all():
+    policy = free.copy()
+    policy["pol_origin"] = "*"
 
-    corsed = mw(Response(), verbatim)
-    res = preflight.get_response(corsed)
-    assert res.headers.get("Access-Control-Allow-Origin", "") == "example.com"
-    assert res.headers.get("Access-Control-Allow-Credentials", "") == "true"
-    assert res.headers.get("Access-Control-Allow-Methods", "") == "put,delete"
-    assert res.headers.get("Access-Control-Allow-Headers", "") == "header1,header2"
-    assert res.headers.get("Access-Control-Max-Age", "0") == "100"
-    assert "Access-Control-Expose-Headers" not in res.headers
-    assert "Vary" not in res.headers
+    corsed = mw(Response("non preflight response"), policy)
 
-    res = post.get_response(corsed)
-    assert res.headers.get("Access-Control-Allow-Origin", "") == "example.com"
-    assert res.headers.get("Access-Control-Allow-Credentials", "") == "true"
-    assert res.headers.get("Access-Control-Expose-Headers", "") == "X-ONLYTHIS,X-ONLYTHAT"
-    assert res.headers.get("Vary", "") == "Origin"
+    ### preflight request
+
+    for origin, expected in [("localhost", "*")]:
+        yield preflight_check_result, corsed, "Origin", origin, expected
+
+
+    ### actual request
+
+    for origin, origin_expected, vary_expected in [("localhost", "localhost", None)]:
+        yield request_check_result, corsed, "Origin", origin, origin_expected, ("Vary", vary_expected)
 
 @with_setup(setup)
-def test_req_origin_no_match():
-    "sending a post from a disallowed host => no allow headers will be returned"
+def test_method_policy_all():
+    policy = free.copy()
+    policy["pol_methods"] = "*"
 
-    corsed = mw(Response(), verbatim)
+    corsed = mw(Response("non preflight response"), policy)
+
+    ### preflight request
+
+    for requested, expected in [("woopy", "woopy")]:
+        yield preflight_check_result, corsed, "Method", requested, expected
+
+
+    ### actual request
+
+    for requested, expected in [("woopy", None)]:
+        yield request_check_result, corsed, "Method", requested, expected
+
+
+@with_setup(setup)
+def test_method_policy_fixed():
+    policy = free.copy()
+    policy["pol_methods"] = "PUT, GET"
+
+    corsed = mw(Response("non preflight response"), policy)
+
+    ### preflight request
+
+    for requested, expected in [("woopy", "PUT, GET")]:
+        yield preflight_check_result, corsed, "Method", requested, expected
+
+
+    ### actual request
+
+    for requested, expected in [("woopy", None)]:
+        yield request_check_result, corsed, "Method", requested, expected
+
+@with_setup(setup)
+def test_header_policy_all():
+    policy = free.copy()
+    policy["pol_headers"] = "*"
+
+    corsed = mw(Response("non preflight response"), policy)
+
+    ### preflight request
+
+    for requested, expected in [("woopy", "woopy")]:
+        yield preflight_check_result, corsed, "Headers", requested, expected
+
+
+    ### actual request
+
+    for requested, expected in [("woopy", None)]:
+        yield request_check_result, corsed, "Headers", requested, expected
+
+
+@with_setup(setup)
+def test_headers_policy_fixed():
+    policy = free.copy()
+    policy["pol_headers"] = "Wooble"
+
+    corsed = mw(Response("non preflight response"), policy)
+
+    ### preflight request
+
+    for requested, expected in [("woopy", "Wooble")]:
+        yield preflight_check_result, corsed, "Headers", requested, expected
+
+
+    ### actual request
+
+    for requested, expected in [("woopy", None)]:
+        yield request_check_result, corsed, "Headers", requested, expected
+
+@with_setup(setup)
+def test_credentials_policy_true():
+    "Allow-Credentials should be added to the response"
+    policy = free.copy()
+    policy["pol_credentials"] = "true"
+
+    corsed = mw(Response("non preflight response"), policy)
+
+    ### preflight request
+
+    for requested, expected in [("woopy", "woopy")]:
+        yield preflight_check_result, corsed, "Headers", requested, expected, ("Access-Control-Allow-Credentials", "true")
+
+
+    ### actual request
+
+    for requested, expected in [("woopy", None)]:
+        yield request_check_result, corsed, "Headers", requested, expected, ("Access-Control-Allow-Credentials", "true")
+
+@with_setup(setup)
+def test_credentials_policy_no():
+    "Allow-Credentials should not be present, if policy is different from 'yes'"
+    policy = free.copy()
+    policy["pol_credentials"] = "no" # something different from "yes"
+
+    corsed = mw(Response("non preflight response"), policy)
+
+    ### preflight request
+
+    for requested, expected in [("woopy", "woopy")]:
+        yield preflight_check_result, corsed, "Headers", requested, expected, ("Access-Control-Allow-Credentials", None)
+
+
+    ### actual request
+
+    for requested, expected in [("woopy", None)]:
+        yield request_check_result, corsed, "Headers", requested, expected, ("Access-Control-Allow-Credentials", None)
+
+@with_setup(setup)
+def test_credentials_policy_none():
+    "Allow-Credentials should not be present"
+    policy = free.copy()
+    del policy["pol_credentials"]
+
+    corsed = mw(Response("non preflight response"), policy)
+
+    ### preflight request
+
+    for requested, expected in [("woopy", "woopy")]:
+        yield preflight_check_result, corsed, "Headers", requested, expected, ("Access-Control-Allow-Credentials", None)
+
+
+    ### actual request
+
+    for requested, expected in [("woopy", None)]:
+        yield request_check_result, corsed, "Headers", requested, expected, ("Access-Control-Allow-Credentials", None)
+
+@with_setup(setup)
+def test_age_policy_set():
+    "Add Max-Age added to preflight response"
+    policy = free.copy()
+    policy["pol_maxage"]="100"
+
+    corsed = mw(Response("non preflight response"), policy)
+
+    ### preflight request
+
+    for requested, expected in [("woopy", "woopy")]:
+        yield preflight_check_result, corsed, "Headers", requested, expected, ("Access-Control-Max-Age", "100")
+
+
+    ### actual request
+
+    for requested, expected in [("woopy", None)]:
+        yield request_check_result, corsed, "Headers", requested, expected, ("Access-Control-Max-Age", None)
+
+@with_setup(setup)
+def test_age_policy_unset():
+    "Add Max-Age not in preflight response"
+    policy = free.copy()
+    del policy["pol_maxage"]
+
+    corsed = mw(Response("non preflight response"), policy)
+
+    ### preflight request
+
+    for requested, expected in [("woopy", "woopy")]:
+        yield preflight_check_result, corsed, "Headers", requested, expected, ("Access-Control-Max-Age", None)
+
+
+    ### actual request
+
+    for requested, expected in [("woopy", None)]:
+        yield request_check_result, corsed, "Headers", requested, expected, ("Access-Control-Max-Age", None)
+
+@with_setup(setup)
+def test_expose_header_policy_set():
+    "Add Expose-Headers in actual request if policy says so"
+    policy = free.copy()
+    policy["pol_expose_headers"] = "exposed"
+
+    corsed = mw(Response("non preflight response"), policy)
+
+    ### preflight request
+
+    for requested, expected in [("woopy", "woopy")]:
+        yield preflight_check_result, corsed, "Headers", requested, expected, ("Access-Control-Expose-Headers", None)
+
+
+    ### actual request
+
+    for requested, expected in [("woopy", None)]:
+        yield request_check_result, corsed, "Headers", requested, expected, ("Access-Control-Expose-Headers", "exposed")
+
+@with_setup(setup)
+def test_expose_header_policy_unset():
+    "No Expose-Headers in actual request if not given"
+    policy = free.copy()
+    del policy["pol_expose_headers"]
+
+    corsed = mw(Response("non preflight response"), policy)
+
+    ### preflight request
+
+    for requested, expected in [("woopy", "woopy")]:
+        yield preflight_check_result, corsed, "Headers", requested, expected, ("Access-Control-Expose-Headers", None)
+
+
+    ### actual request
+
+    for requested, expected in [("woopy", None)]:
+        yield request_check_result, corsed, "Headers", requested, expected, ("Access-Control-Expose-Headers", None)
+
+def preflight_check_result(corsed, check_header, requested, result_expected, *more_header_expectpairs):
+    casename=getRequestHeaderName(check_header)
+    preflight = prepRequest(preflight_headers, **{check_header:requested})
     res = preflight.get_response(corsed)
-    assert res.headers.get("Access-Control-Allow-Origin", "") == "example.com"
-    assert res.headers.get("Access-Control-Allow-Credentials", "") == "true"
-    assert res.headers.get("Access-Control-Allow-Methods", "") == "put,delete"
-    assert res.headers.get("Access-Control-Allow-Headers", "") == "header1,header2"
-    assert res.headers.get("Access-Control-Max-Age", "0") == "100"
-    assert "Access-Control-Expose-Headers" not in res.headers
-    assert "Vary" not in res.headers
+    res_header = getResponseHeaderName(check_header)
+    result=res.headers.get(res_header)
+    assert result == result_expected, "Preflight %s - %s: expected '%s' but got '%s'" % (casename, res_header, result_expected, result)
 
-    res = post2.get_response(corsed)
-    assert "Access-Control-Allow-Origin" not in res.headers
-    assert "Access-Control-Allow-Credentials" not in res.headers
-    assert "Access-Control-Expose-Headers" not in res.headers
-    assert "Vary" not in res.headers
+    for header, expected in more_header_expectpairs:
+        result=res.headers.get(header)
+        assert result == expected, "Preflight %s - %s: expected '%s' but got '%s'" % (casename, header, expected, result)
 
-    
+def request_check_result(corsed, check_header, requested, result_expected, *more_header_expectpairs):
+    casename=getRequestHeaderName(check_header)
+
+    request = prepRequest(request_headers, **{check_header:requested})
+    res = request.get_response(corsed)
+    result=res.body.decode("utf-8")
+    expected = "non preflight response"
+    assert result == expected, "ActualRequest %s - Body: expected '%s' but got '%s'" % (casename, expected, result)
+    res_header = getResponseHeaderName(check_header)
+    result=res.headers.get(res_header)
+    assert result == result_expected, "ActualRequest %s - %s: expected '%s' but got '%s'" % (casename, res_header, result_expected, result)
+    for header, expected in more_header_expectpairs:
+        result=res.headers.get(header)
+        assert result == expected, "ActualRequest %s - %s: expected '%s' but got '%s'" % (casename, header, expected, result)
+
+def getResponseHeaderName(name):
+    rename={
+        "Method":"Access-Control-Allow-Methods"
+        ,"Origin":"Access-Control-Allow-Origin"
+        ,"Headers":"Access-Control-Allow-Headers"
+        ,"Credentials":"Access-Control-Allow-Credentials"
+        ,"Age":"Access-Control-Max-Age"
+    }
+    return rename.get(name)
+
+def getRequestHeaderName(name):
+    if name not in ("Origin", ):
+            name="Access-Control-Request-" + name.capitalize()
+    return name

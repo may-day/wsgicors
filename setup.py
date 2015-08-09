@@ -8,7 +8,7 @@ here = os.path.abspath(os.path.dirname(__file__))
 def readfile(fname):
     return codecs.open(os.path.join(here, fname), encoding='utf-8').read()
 
-version = '0.5.0'
+version = '0.5.1'
 
 README = readfile('README.rst')
 CHANGES = readfile('CHANGES.rst')

@@ -63,7 +63,9 @@ class CORS(object):
         def matchlist(origin, allowed_origins):
             return reduce(lambda accu, x: matchpattern(accu, x, origin.lower()), allowed_origins, False)
 
-        if 'OPTIONS' == environ['REQUEST_METHOD'] and environ.get("HTTP_ACCESS_CONTROL_REQUEST_METHOD") is not None:
+        # we handle the request ourself only if it is identified as a prefilght request
+        if 'OPTIONS' == environ['REQUEST_METHOD'] and environ.get("HTTP_ACCESS_CONTROL_REQUEST_METHOD") is not None \
+           and environ.get("HTTP_ORIGIN") is not None:
             resp = []
             if self.policy == "deny":
                 pass
@@ -121,8 +123,6 @@ class CORS(object):
                     origin = orig
                 elif self.pol_origin == "*":
                     origin = "*"
-                elif self.pol_origin == orig:
-                    origin = orig
 
                 if self.pol_credentials == 'true' and self.pol_origin == "*":
                     # for credentialed access '*' are ignored in origin

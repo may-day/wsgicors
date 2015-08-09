@@ -1,6 +1,11 @@
 Changes
 =======
 
+Version 0.5.1
+-------------
+- check for request being preflight
+- reworked tests
+
 Version 0.5.0
 -------------
 
