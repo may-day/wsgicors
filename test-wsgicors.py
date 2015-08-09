@@ -88,25 +88,25 @@ def testdeny():
 @with_setup(setup)
 def test_origin_policy_match():
     policy = free.copy()
-    policy["pol_origin"] = "example.com example?.com *.example.com"
+    policy["pol_origin"] = "http://example.com example?.com https://*.example.com"
 
     corsed = mw(Response("non preflight response"), policy)
 
     ### preflight request
 
     for origin, expected in [("localhost", None), 
-                             ("example.com", "example.com"), 
+                             ("http://example.com", "http://example.com"), 
                              ("example2.com", "example2.com"), 
-                             ("www.example.com", "www.example.com")]:
+                             ("https://www.example.com", "https://www.example.com")]:
         yield preflight_check_result, corsed, "Origin", origin, expected
 
 
     ### actual request
 
     for origin, origin_expected, vary_expected in [("localhost", None, None), 
-                                                   ("example.com", "example.com", "Origin"), 
+                                                   ("http://example.com", "http://example.com", "Origin"), 
                                                    ("example2.com", "example2.com", "Origin"), 
-                                                   ("www.example.com", "www.example.com", "Origin")]:
+                                                   ("https://www.example.com", "https://www.example.com", "Origin")]:
         yield request_check_result, corsed, "Origin", origin, origin_expected, ("Vary", vary_expected)
 
 
