@@ -1,6 +1,11 @@
 Changes
 =======
 
+Version 0.6.0
+-------------
+- support for multiple policies
+- caching of matching results
+
 Version 0.5.1
 -------------
 - check for request being preflight

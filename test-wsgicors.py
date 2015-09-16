@@ -33,11 +33,48 @@ free = {"policy":"pol",
         "pol_maxage":"100"
         }
 
+multi = {"policy":"pol2,pol1", 
+        "pol1_origin":"*", 
+        "pol1_methods":"*", 
+        "pol1_headers":"*",
+        "pol1_expose_headers":"*",
+        "pol1_credentials":"true",
+        "pol1_maxage":"100",
+        "pol2_origin":"*.woopy.com", 
+        "pol2_methods":"*", 
+        "pol2_headers":"*",
+        "pol2_expose_headers":"*",
+        "pol2_credentials":"true",
+        "pol2_maxage":"100",
+        }
+
 preflight_headers = {'REQUEST_METHOD':'OPTIONS', 'Access-Control-Request-Method':'*', 'Origin':'localhost'}
 request_headers = {'REQUEST_METHOD':'GET', 'Access-Control-Request-Method':'*', 'Origin':'localhost'}
 
 def setup():
     pass
+
+@with_setup(setup)
+def test_selectPolicy():
+    "check whether correct policy is returned"
+    multi2 = multi.copy()
+    multi2["policy"] = "pol2,pol1"
+    corsed = mw(Response("this is not a preflight response"), multi2)
+    
+    policyname, ret_origin = corsed.selectPolicy("palim.woopy.com")
+    assert policyname == "pol2", "'pol2' should have been returned since it matches first (but result was: '%s')" % policyname
+    assert ret_origin == "palim.woopy.com", "'palim.woopy.com' expected since its matched by pol2 (but result was: '%s')" % ret_origin
+
+    policyname, ret_origin = corsed.selectPolicy("palim.com")
+    assert policyname == "pol1", "'pol1' should have been returned since it matches first (but result was: '%s')" % policyname
+    assert ret_origin == "*", "'*' expected since its matched by pol1 (but result was: '%s')" % ret_origin
+
+    multi2 = multi.copy()
+    multi2["policy"] = "pol1,pol2"
+    corsed = mw(Response("this is not a preflight response"), multi2)
+    policyname, ret_origin = corsed.selectPolicy("palim.woopy.com")
+    assert policyname == "pol1", "'pol1' should have been returned since it matches first (but result was: '%s')" % policyname
+    assert ret_origin == "*", "'*' expectedsince its matched by pol1 (but result was: '%s')" % ret_origin
 
 @with_setup(setup)
 def test_non_preflight_are_not_answered():

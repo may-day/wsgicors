@@ -8,12 +8,17 @@ here = os.path.abspath(os.path.dirname(__file__))
 def readfile(fname):
     return codecs.open(os.path.join(here, fname), encoding='utf-8').read()
 
-version = '0.5.1'
+version = '0.6.0'
 
 README = readfile('README.rst')
 CHANGES = readfile('CHANGES.rst')
 AUTHORS = readfile('AUTHORS.rst')
 
+install_requires=[]
+
+if sys.version_info < (3, 2):
+    install_requires=["backports.functools_lru_cache == 1.0"]
+    
 # hack, or test wont run on py2.7
 try:
     import multiprocessing
@@ -41,6 +46,7 @@ setup(name='wsgicors',
       url="https://github.com/may-day/wsgicors",
       license='Apache Software License 2.0',
       py_modules=["wsgicors"],
+      install_requires = install_requires,
       tests_require = [
         'nose',
         'nose-testconfig',

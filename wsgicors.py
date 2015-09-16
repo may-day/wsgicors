@@ -20,87 +20,141 @@
 
 import fnmatch
 from functools import reduce
-
+from collections import namedtuple
+try:
+    from functools import lru_cache
+except ImportError:
+    from backports.functools_lru_cache import lru_cache
 
 class CORS(object):
     "WSGI middleware allowing CORS requests to succeed"
 
+    @staticmethod
+    def matchpattern(accu, pattern, host):
+        return accu or fnmatch.fnmatch(host, pattern)
+
+    @staticmethod
+    def matchlist(origin, allowed_origins):
+        return reduce(lambda accu, x: CORS.matchpattern(accu, x, origin.lower()), allowed_origins, False)
+
+
     def __init__(self, application, cfg=None, **kw):
 
-        if kw:  # direct config
-            self.policy = "direct"
-        else:  # via configfile, paster factory for instance
-            cfg = cfg or {}
-            self.policy = cfg.get("policy", "deny")
-            kw = {}
-            prefix = self.policy + "_"
-            for k, v in filter(lambda key_value: key_value[0].startswith(prefix), cfg.items()):
-                kw[k.split(prefix)[-1]] = v
+        Policy = namedtuple("Policy", ["name", "origin", "methods", "headers", "expose_headers", "credentials", "maxage", "match"])
 
-        # copy or * or a space separated list of hostnames, possibly with filename wildcards "*" and "?"
-        self.pol_origin = kw.get("origin", "")  
-        if self.pol_origin not in ("copy", "*"):
-            self.match = list(filter(lambda x: x != "*", map(lambda x: x.strip(), self.pol_origin.split(" "))))
-        else:
-            self.match = []
+        self.policies = {}
+        if kw and "policy" not in kw:  # direct config
+            self.activepolicies = ["direct"]
+            self.matchstrategy = "firstmatch"
+            self.policies["direct"]=kw
+        else:  # multiple policies programatically or via configfile (paster factory for instance)
+            cfg = kw or cfg or {}
+            self.activepolicies = list(map(lambda x: x.strip(), cfg.get("policy", "deny").split(",")))
+            self.matchstrategy = cfg.get("matchstrategy", "firstmatch")
 
-        # copy or * or a space separated list of hostnames, possibly with filename wildcards "*" and "?"
-        self.pol_origin = kw.get("origin", "")  
-        self.pol_methods = kw.get("methods", "")  # * or list of methods
-        self.pol_headers = kw.get("headers", "")  # * or list of headers
-        self.pol_expose_headers = kw.get("expose_headers", "")  # * or list of headers to expose to the client
-        self.pol_credentials = kw.get("credentials", "false")  # true or false
-        self.pol_maxage = kw.get("maxage", "")  # in seconds
+            for policy in self.activepolicies:
+                kw = {}
+                prefix = policy + "_"
+                for k, v in filter(lambda key_value: key_value[0].startswith(prefix), cfg.items()):
+                    kw[k.split(prefix)[-1]] = v
+                self.policies[policy]=kw
+
+        for policy in self.activepolicies:
+            kw = self.policies[policy]
+            # copy or * or a space separated list of hostnames, possibly with filename wildcards "*" and "?"
+            pol_origin = kw.get("origin", "")  
+            if pol_origin not in ("copy", "*"):
+                match = list(filter(lambda x: x != "*", map(lambda x: x.strip(), pol_origin.split(" "))))
+            else:
+                match = []
+
+            # copy or * or a space separated list of hostnames, possibly with filename wildcards "*" and "?"
+            pol_methods = kw.get("methods", "")  # * or list of methods
+            pol_headers = kw.get("headers", "")  # * or list of headers
+            pol_expose_headers = kw.get("expose_headers", "")  # * or list of headers to expose to the client
+            pol_credentials = kw.get("credentials", "false")  # true or false
+            pol_maxage = kw.get("maxage", "")  # in seconds
+            pol=Policy(name=policy, 
+                       origin=pol_origin, 
+                       methods=pol_methods, 
+                       headers=pol_headers, 
+                       expose_headers=pol_expose_headers, 
+                       credentials=pol_credentials, 
+                       maxage=pol_maxage, 
+                       match = match)
+            self.policies[policy] = pol
+
+            # a little sanity check
+            configkeys="origin,methods,headers,expose_headers,credentials,maxage".split(",")
+            existingkeys=[k for k in configkeys if k in kw]
+                
+            if "origin" not in kw:
+                if existingkeys:
+                    print("The policy '%s' was referenced but has no value for 'origin' set. Nothing good can come from this." % policy)
+                elif policy != "deny":
+                    print("The policy '%s' was referenced but hasn't defined any keys. This might be an case sensitivity issue." % policy)
+                    
+
 
         self.application = application
 
+    @lru_cache(maxsize=200)
+    def selectPolicy(self, origin):
+        "Based on the matching strategy and the origin a tuple of policyname and origin to pass back is returned."
+        ret_origin = None
+        policyname = None
+        if self.matchstrategy == "firstmatch":
+            for pol in self.activepolicies:
+                policy=self.policies[pol]
+                ret_origin = None
+                policyname = policy.name
+                if policyname == "deny":
+                    break
+                if origin and policy.match:
+                    if CORS.matchlist(origin, policy.match):
+                        ret_origin = origin
+                elif policy.origin == "copy":
+                    ret_origin = origin
+                elif policy.origin:
+                    ret_origin = policy.origin
+                if ret_origin:
+                    break
+        return policyname, ret_origin 
 
     def __call__(self, environ, start_response):
-
-        def matchpattern(accu, pattern, host):
-            return accu or fnmatch.fnmatch(host, pattern)
-
-        def matchlist(origin, allowed_origins):
-            return reduce(lambda accu, x: matchpattern(accu, x, origin.lower()), allowed_origins, False)
 
         # we handle the request ourself only if it is identified as a prefilght request
         if 'OPTIONS' == environ['REQUEST_METHOD'] and environ.get("HTTP_ACCESS_CONTROL_REQUEST_METHOD") is not None \
            and environ.get("HTTP_ORIGIN") is not None:
             resp = []
-            if self.policy == "deny":
+
+            orig = environ.get("HTTP_ORIGIN")
+            policyname, origin = self.selectPolicy(orig)
+
+            if policyname == "deny":
                 pass
             else:
-
-                origin = None
+                policy = self.policies[policyname]
                 methods = None
                 headers = None
                 credentials = None
                 maxage = None
 
-                orig = environ.get("HTTP_ORIGIN", None)
-                if orig and self.match:
-                    if matchlist(orig, self.match):
-                        origin = orig
-                elif self.pol_origin == "copy":
-                    origin = orig
-                elif self.pol_origin:
-                    origin = self.pol_origin
-
-                if self.pol_methods == "*":
+                if policy.methods == "*":
                     methods = environ.get("HTTP_ACCESS_CONTROL_REQUEST_METHOD", None)
-                elif self.pol_methods:
-                    methods = self.pol_methods
+                elif policy.methods:
+                    methods = policy.methods
 
-                if self.pol_headers == "*":
+                if policy.headers == "*":
                     headers = environ.get("HTTP_ACCESS_CONTROL_REQUEST_HEADERS", None)
-                elif self.pol_headers:
-                    headers = self.pol_headers
+                elif policy.headers:
+                    headers = policy.headers
 
-                if self.pol_credentials == "true":
+                if policy.credentials == "true":
                     credentials = "true"
 
-                if self.pol_maxage:
-                    maxage = self.pol_maxage
+                if policy.maxage:
+                    maxage = policy.maxage
 
                 if origin: resp.append(('Access-Control-Allow-Origin', origin))
                 if methods: resp.append(('Access-Control-Allow-Methods', methods))
@@ -113,31 +167,27 @@ class CORS(object):
             return []
 
         orig = environ.get("HTTP_ORIGIN", None)
-        if orig and self.policy != "deny":
+        policyname, ret_origin = self.selectPolicy(orig)
+
+        if orig and policyname != "deny":
             def custom_start_response(status, headers, exc_info=None):
-                origin = None
 
-                if orig and self.match and matchlist(orig, self.match):
-                    origin = orig
-                elif self.pol_origin == "copy":
-                    origin = orig
-                elif self.pol_origin == "*":
-                    origin = "*"
-
-                if self.pol_credentials == 'true' and self.pol_origin == "*":
+                policyname, ret_origin = self.selectPolicy(orig)
+                policy = self.policies[policyname]
+                if policy.credentials == 'true' and policy.origin == "*":
                     # for credentialed access '*' are ignored in origin
-                    origin = orig
+                    ret_origin = orig
 
-                if origin:
-                    headers.append(('Access-Control-Allow-Origin', origin))
+                if ret_origin:
+                    headers.append(('Access-Control-Allow-Origin', ret_origin))
 
-                    if self.pol_credentials == 'true':
+                    if policy.credentials == 'true':
                         headers.append(('Access-Control-Allow-Credentials', 'true'))
 
-                    if self.pol_expose_headers:
-                        headers.append(('Access-Control-Expose-Headers', self.pol_expose_headers))
+                    if policy.expose_headers:
+                        headers.append(('Access-Control-Expose-Headers', policy.expose_headers))
 
-                    if self.pol_origin != "*":
+                    if policy.origin != "*":
                         headers.append(('Vary', 'Origin'))
 
                 return start_response(status, headers, exc_info)
