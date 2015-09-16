@@ -65,6 +65,10 @@ def test_selectPolicy():
     assert policyname == "pol2", "'pol2' should have been returned since it matches first (but result was: '%s')" % policyname
     assert ret_origin == "palim.woopy.com", "'palim.woopy.com' expected since its matched by pol2 (but result was: '%s')" % ret_origin
 
+    policyname, ret_origin = corsed.selectPolicy("palim.com")
+    assert policyname == "pol1", "'pol1' should have been returned since it matches first (but result was: '%s')" % policyname
+    assert ret_origin == "*", "'*' expected since its matched by pol1 (but result was: '%s')" % ret_origin
+
     multi2 = multi.copy()
     multi2["policy"] = "pol1,pol2"
     corsed = mw(Response("this is not a preflight response"), multi2)

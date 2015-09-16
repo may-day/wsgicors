@@ -57,19 +57,23 @@ waitress for instance:
 
     [filter:cors]
     use = egg:wsgicors#middleware
-    policy=free
+    # define a "free" policy
     free_origin=copy
     free_headers=*
     free_expose_headers=*
-    free_methods=*
+    free_methods=HEAD, OPTIONS, GET
     free_maxage=180
 
-    policy=subdom
+    # define a "subdom" policy
     subdom_origin=http://example.com http://example2.com https://*.example.com
     subdom_headers=*
-    subdom_methods=*
+    subdom_methods=HEAD, OPTIONS, GET, POST, PUT, DELETE
     subdom_expose_headers=Foo, Doom
     subdom_maxage=180
+
+    # define a combination of policies, they are evaluated in the order given by the policy keyword
+    # the first that matches the request's origin will be used
+   policy=subdom,free
 
 Keywords are:
 
@@ -86,7 +90,7 @@ for ``origin``:
    like ``*`` or ``?`` (fnmatch lib is used for matching). If a match is
    found the original host is returned.
 -  any other literal will be be copied verbatim (like ``*`` for instance
-   to allow every source)
+   to allow any source)
 
 for ``headers``:
 
@@ -118,3 +122,5 @@ for ``maxage``:
 As can be seen in the example above, a policy needs to be created with
 the ``policy`` keyword. The options need then be prefixed with the
 policy name and a ``_``.
+The ``policy`` keyword itself can be a comma separated list. If so the origin of the request is matched against the origins defined in the policies and the first matching is the policy used.
+

@@ -84,6 +84,17 @@ class CORS(object):
                        match = match)
             self.policies[policy] = pol
 
+            # a little sanity check
+            configkeys="origin,methods,headers,expose_headers,credentials,maxage".split(",")
+            existingkeys=[k for k in configkeys if k in kw]
+                
+            if "origin" not in kw:
+                if existingkeys:
+                    print("The policy '%s' was referenced but has no value for 'origin' set. Nothing good can come from this." % policy)
+                elif policy != "deny":
+                    print("The policy '%s' was referenced but hasn't defined any keys. This might be an case sensitivity issue." % policy)
+                    
+
 
         self.application = application
 
