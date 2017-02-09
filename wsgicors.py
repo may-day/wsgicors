@@ -68,20 +68,22 @@ class CORS(object):
             else:
                 match = []
 
+            pol_methods = kw.get("methods", "")
+            methods = list(map(lambda x: x.strip(), pol_methods.split(",")))
+
             # copy or * or a space separated list of hostnames, possibly with filename wildcards "*" and "?"
-            pol_methods = kw.get("methods", "")  # * or list of methods
             pol_headers = kw.get("headers", "")  # * or list of headers
             pol_expose_headers = kw.get("expose_headers", "")  # * or list of headers to expose to the client
             pol_credentials = kw.get("credentials", "false")  # true or false
             pol_maxage = kw.get("maxage", "")  # in seconds
             pol=Policy(name=policy, 
                        origin=pol_origin, 
-                       methods=pol_methods, 
+                       methods=methods,
                        headers=pol_headers, 
                        expose_headers=pol_expose_headers, 
                        credentials=pol_credentials, 
                        maxage=pol_maxage, 
-                       match = match)
+                       match=match)
             self.policies[policy] = pol
 
             # a little sanity check
@@ -99,19 +101,22 @@ class CORS(object):
         self.application = application
 
     @lru_cache(maxsize=200)
-    def selectPolicy(self, origin):
+    def selectPolicy(self, origin, request_method=None):
         "Based on the matching strategy and the origin a tuple of policyname and origin to pass back is returned."
         ret_origin = None
         policyname = None
-        if self.matchstrategy == "firstmatch":
+        if self.matchstrategy in ("firstmatch", "mostspecific"):
             for pol in self.activepolicies:
                 policy=self.policies[pol]
                 ret_origin = None
                 policyname = policy.name
                 if policyname == "deny":
                     break
-                if origin and policy.match:
+                if origin and policy.match and self.matchstrategy == "firstmatch":
                     if CORS.matchlist(origin, policy.match):
+                        ret_origin = origin
+                elif origin and policy.match and request_method and self.matchstrategy == "mostspecific":
+                    if CORS.matchlist(origin, policy.match) and CORS.matchlist(request_method, policy.methods):
                         ret_origin = origin
                 elif policy.origin == "copy":
                     ret_origin = origin
@@ -129,7 +134,8 @@ class CORS(object):
             resp = []
 
             orig = environ.get("HTTP_ORIGIN")
-            policyname, origin = self.selectPolicy(orig)
+            ac_request_method = environ.get("HTTP_ACCESS_CONTROL_REQUEST_METHOD")
+            policyname, origin = self.selectPolicy(orig, ac_request_method)
 
             if policyname == "deny":
                 pass
@@ -140,10 +146,10 @@ class CORS(object):
                 credentials = None
                 maxage = None
 
-                if policy.methods == "*":
+                if "*" in policy.methods:
                     methods = environ.get("HTTP_ACCESS_CONTROL_REQUEST_METHOD", None)
                 elif policy.methods:
-                    methods = policy.methods
+                    methods = ", ".join(policy.methods)
 
                 if policy.headers == "*":
                     headers = environ.get("HTTP_ACCESS_CONTROL_REQUEST_HEADERS", None)
@@ -167,12 +173,13 @@ class CORS(object):
             return []
 
         orig = environ.get("HTTP_ORIGIN", None)
-        policyname, ret_origin = self.selectPolicy(orig)
+        request_method = environ['REQUEST_METHOD']
+        policyname, ret_origin = self.selectPolicy(orig, request_method)
 
         if orig and policyname != "deny":
             def custom_start_response(status, headers, exc_info=None):
 
-                policyname, ret_origin = self.selectPolicy(orig)
+                policyname, ret_origin = self.selectPolicy(orig, request_method)
                 policy = self.policies[policyname]
                 if policy.credentials == 'true' and policy.origin == "*":
                     # for credentialed access '*' are ignored in origin
