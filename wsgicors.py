@@ -34,8 +34,8 @@ class CORS(object):
         return accu or fnmatch.fnmatch(host, pattern)
 
     @staticmethod
-    def matchlist(origin, allowed_origins):
-        return reduce(lambda accu, x: CORS.matchpattern(accu, x, origin.lower()), allowed_origins, False)
+    def matchlist(origin, allowed_origins, case_sensitive=False):
+        return reduce(lambda accu, x: CORS.matchpattern(accu, x, origin.lower() if not case_sensitive else origin), allowed_origins, False)
 
 
     def __init__(self, application, cfg=None, **kw):
@@ -112,18 +112,16 @@ class CORS(object):
                 policyname = policy.name
                 if policyname == "deny":
                     break
-                if origin and policy.match and self.matchstrategy == "firstmatch":
-                    if CORS.matchlist(origin, policy.match):
+                if (self.matchstrategy == "mostspecific" and CORS.matchlist(request_method, policy.methods, case_sensitive=True)) or self.matchstrategy == "firstmatch":
+                    if origin and policy.match:
+                        if CORS.matchlist(origin, policy.match):
+                            ret_origin = origin
+                    elif policy.origin == "copy":
                         ret_origin = origin
-                elif origin and policy.match and request_method and self.matchstrategy == "mostspecific":
-                    if CORS.matchlist(origin, policy.match) and CORS.matchlist(request_method, policy.methods):
-                        ret_origin = origin
-                elif policy.origin == "copy":
-                    ret_origin = origin
-                elif policy.origin:
-                    ret_origin = policy.origin
-                if ret_origin:
-                    break
+                    elif policy.origin:
+                        ret_origin = policy.origin
+                    if ret_origin:
+                        break
         return policyname, ret_origin 
 
     def __call__(self, environ, start_response):
