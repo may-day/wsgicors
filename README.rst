@@ -1,7 +1,8 @@
-wsgicors |buildstatus|
+wsgicors
 ========
 
-.. |buildstatus| image:: https://travis-ci.org/may-day/wsgicors.svg?branch=master
+.. image:: https://travis-ci.org/may-day/wsgicors.svg?branch=master
+    :target: https://travis-ci.org/may-day/wsgicors
 
 This is a WSGI middleware that answers CORS preflight requests and adds
 the needed header to the response. For CORS see:
