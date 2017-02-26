@@ -48,6 +48,19 @@ multi = {"policy":"pol2,pol1",
         "pol2_maxage":"100",
         }
 
+# example from https://github.com/may-day/wsgicors/pull/16
+# note that pol1 does not allow PUT, but pol2 does
+verbmulti = {"policy":"pol2,pol1",
+             "pol1_origin":"*.ourdomain.com",
+             "pol1_headers":"*",
+             "pol1_methods":"HEAD, OPTIONS, GET, POST, PUT, DELETE",
+             "pol1_maxage":"180",
+             "pol2_origin":"*",
+             "pol2_headers":"*",
+             "pol2_methods":"HEAD, OPTIONS, GET",
+             "pol2_maxage":"180",
+             }
+
 preflight_headers = {'REQUEST_METHOD':'OPTIONS', 'Access-Control-Request-Method':'*', 'Origin':'localhost'}
 request_headers = {'REQUEST_METHOD':'GET', 'Access-Control-Request-Method':'*', 'Origin':'localhost'}
 
@@ -55,10 +68,11 @@ def setup():
     pass
 
 @with_setup(setup)
-def test_selectPolicy():
+def test_selectPolicy_firstmatch():
     "check whether correct policy is returned"
     multi2 = multi.copy()
     multi2["policy"] = "pol2,pol1"
+    multi2["matchstrategy"] = "firstmatch"
     corsed = mw(Response("this is not a preflight response"), multi2)
     
     policyname, ret_origin = corsed.selectPolicy("palim.woopy.com")
@@ -76,6 +90,26 @@ def test_selectPolicy():
     assert policyname == "pol1", "'pol1' should have been returned since it matches first (but result was: '%s')" % policyname
     assert ret_origin == "*", "'*' expectedsince its matched by pol1 (but result was: '%s')" % ret_origin
 
+@with_setup(setup)
+def test_selectPolicy_verbmatch():
+    "check whether correct policy is returned"
+    multi2 = verbmulti.copy()
+    multi2["policy"] = "pol2,pol1"
+    multi2["matchstrategy"] = "verbmatch"
+    corsed = mw(Response("this is not a preflight response"), multi2)
+    
+    policyname, ret_origin = corsed.selectPolicy("ourdomain", "PUT")
+    assert policyname == "pol1", "'pol1' should have been returned since it matches both origin and verb first (but result was: '%s')" % policyname
+
+    multi2 = verbmulti.copy()
+    multi2["policy"] = "pol2,pol1"
+    multi2["matchstrategy"] = "verbmatch"
+    multi2["pol1_methods"] = "*"
+    corsed = mw(Response("this is not a preflight response"), multi2)
+    
+    policyname, ret_origin = corsed.selectPolicy("ourdomain", "PUT")
+    assert policyname == "pol1", "'pol1' should have been returned since it matches both origin and verb first (but result was: '%s')" % policyname
+    
 @with_setup(setup)
 def test_non_preflight_are_not_answered():
     "requests that don't match preflight criteria are ignored"

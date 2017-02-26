@@ -13,5 +13,7 @@ The following people contributed directly or indirectly to this project:
 - `Ryan Shaw <https://github.com/ryankshaw>`_
 - `David Douard <https://github.com/douardda>`_
 - `MattSANU <https://github.com/MattSANU>`_
-
+- `Sami Salonen <https://github.com/ssalonen>`_
+- `Sami Salonen <https://github.com/ssalonen>`_
+- `Wouter Claeys <https://github.com/claeyswo>`_
 Please add yourself here when you submit your first pull request.

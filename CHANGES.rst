@@ -1,6 +1,11 @@
 Changes
 =======
 
+Version 0.7.0
+-------------
+- ``verbmulti`` matching strategy, that matches the first listed policy that also matches the requested METHOD
+- relaxed dependency on lru_cache version
+  
 Version 0.6.0
 -------------
 - support for multiple policies
