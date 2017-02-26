@@ -17,7 +17,7 @@ AUTHORS = readfile('AUTHORS.rst')
 install_requires=[]
 
 if sys.version_info < (3, 2):
-    install_requires=["backports.functools_lru_cache == 1.0"]
+    install_requires=["backports.functools_lru_cache >= 1.0"]
     
 # hack, or test wont run on py2.7
 try:
